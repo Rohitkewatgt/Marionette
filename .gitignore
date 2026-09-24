@@ -1,0 +1,22 @@
+# Environment variables / secrets
+.env
+
+# Node.js dependencies
+node_modules/
+
+# Generated TTS audio
+audio/
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/
+
+# Visual Studio
+.vs/
+
+# OS files
+.DS_Store
+Thumbs.db
