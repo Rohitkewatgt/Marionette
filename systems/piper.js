@@ -17,15 +17,25 @@ const PIPER_MODEL = path.join(
 let piperProcess = null;
 let piperReady = false;
 
+let readinessPromise = null;
+let resolveReadiness = null;
+let rejectReadiness = null;
+
 function startPiper() {
     if (piperProcess) {
         console.log("Piper is already running.");
-        return;
+
+        return readinessPromise;
     }
 
     console.log("Starting Piper...");
 
     piperReady = false;
+
+    readinessPromise = new Promise((resolve, reject) => {
+        resolveReadiness = resolve;
+        rejectReadiness = reject;
+    });
 
     piperProcess = spawn(
         PYTHON_COMMAND,
@@ -46,6 +56,14 @@ function startPiper() {
 
         piperProcess = null;
         piperReady = false;
+
+        if (rejectReadiness) {
+            rejectReadiness(error);
+        }
+
+        readinessPromise = null;
+        resolveReadiness = null;
+        rejectReadiness = null;
     });
 
     piperProcess.stdout.on("data", data => {
@@ -59,25 +77,52 @@ function startPiper() {
     piperProcess.on("close", code => {
         console.log(`Piper stopped with code ${code}`);
 
+        const wasReady = piperReady;
+
         piperProcess = null;
         piperReady = false;
+
+        if (!wasReady && rejectReadiness) {
+            rejectReadiness(
+                new Error("Piper stopped before becoming ready.")
+            );
+        }
+
+        readinessPromise = null;
+        resolveReadiness = null;
+        rejectReadiness = null;
     });
 
     waitForPiper();
+
+    return readinessPromise;
 }
 
 function waitForPiper() {
+    if (!piperProcess) return;
+
     const request = http.get(
         "http://localhost:5000",
         response => {
+            response.resume();
+
+            if (piperReady) return;
+
             piperReady = true;
 
             console.log("Piper HTTP server is ready.");
+
+            if (resolveReadiness) {
+                resolveReadiness();
+            }
+
+            resolveReadiness = null;
+            rejectReadiness = null;
         }
     );
 
     request.on("error", () => {
-        if (!piperProcess) return;
+        if (!piperProcess || piperReady) return;
 
         setTimeout(waitForPiper, 250);
     });
@@ -85,6 +130,18 @@ function waitForPiper() {
     request.setTimeout(1000, () => {
         request.destroy();
     });
+}
+
+async function waitUntilReady() {
+    if (piperReady) {
+        return;
+    }
+
+    if (!piperProcess) {
+        startPiper();
+    }
+
+    await readinessPromise;
 }
 
 function stopPiper() {
@@ -98,9 +155,7 @@ function stopPiper() {
 }
 
 async function synthesize(text) {
-    if (!piperReady) {
-        throw new Error("Piper is not ready yet.");
-    }
+    await waitUntilReady();
 
     const response = await fetch(
         "http://localhost:5000/synthesize",
@@ -130,5 +185,6 @@ async function synthesize(text) {
 module.exports = {
     startPiper,
     stopPiper,
+    waitUntilReady,
     synthesize
 };
