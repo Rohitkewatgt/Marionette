@@ -5,7 +5,7 @@ const { spawn } = require("child_process");
 const PYTHON_COMMAND =
     process.platform === "win32"
         ? "python"
-        : "python3";
+        : path.join(__dirname, "..", ".venv", "bin", "python");
 
 const PIPER_MODEL = path.join(
     __dirname,

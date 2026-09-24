@@ -4,6 +4,9 @@
 # Node.js dependencies
 node_modules/
 
+# Python virtual environment
+.venv/
+
 # Generated TTS audio
 audio/
 
