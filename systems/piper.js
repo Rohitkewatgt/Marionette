@@ -92,8 +92,9 @@ function stopPiper() {
 
     console.log("Stopping Piper...");
 
+    piperReady = false;
+
     piperProcess.kill();
-    piperProcess = null;
 }
 
 async function synthesize(text) {
